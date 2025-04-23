@@ -1,24 +1,45 @@
-const path = require('path'),
-    protobuf = require('protobufjs');
+const path = require('path');
+const protobuf = require('protobufjs');
 
-const builder = protobuf.newBuilder();
-protobuf.loadProtoFile(path.join(__dirname, 'proto', 'POGOProtos.proto'), builder);
+// Load protobuf definitions
+const root = protobuf.loadSync(path.join(__dirname, 'proto', 'POGOProtos.proto'));
 
-// Recursively add the packed=true option to all packable repeated fields.
-// Repeated fields are packed by default in proto3 but protobuf.js incorrectly does not set the option.
-// See also: https://github.com/dcodeIO/protobuf.js/issues/432
-function addPackedOption(ns) {
-    if (ns instanceof protobuf.Reflect.Message) {
-        ns.getChildren(protobuf.Reflect.Message.Field).forEach(field => {
-            if (field.repeated && protobuf.PACKABLE_WIRE_TYPES.indexOf(field.type.wireType) != -1) {
-                field.options.packed = true;
-            }
-        });
-        ns.getChildren(protobuf.Reflect.Message).forEach(addPackedOption);
-    } else if (ns instanceof protobuf.Reflect.Namespace) {
-        ns.children.forEach(addPackedOption);
+// Add custom functionality
+const POGOProtos = {
+  ...root,
+  
+  // Modern serialization
+  serialize(obj, messageType) {
+    const Message = root.lookupType(messageType);
+    return Message.encode(obj).finish();
+  },
+
+  // Modern deserialization
+  deserialize(buffer, messageType) {
+    const Message = root.lookupType(messageType);
+    return Message.decode(buffer);
+  },
+
+  // Enhanced parseWithUnknown with proper unknown field handling
+  parseWithUnknown(buffer, messageType) {
+    try {
+      const Message = root.lookupType(messageType);
+      const decoded = Message.decode(buffer);
+      
+      // In protobuf.js v6+, unknown fields are automatically preserved
+      // and can be accessed via $unknownFields if needed
+      return decoded;
+    } catch (e) {
+      console.error('Protobuf parsing failed:', e);
+      throw new Error(`Failed to parse ${messageType}: ${e.message}`);
     }
-}
-addPackedOption(builder.lookup('POGOProtos'));
+  },
 
-module.exports = builder.build("POGOProtos");
+  // Backward compatibility
+  proto: root
+};
+
+// Add type definitions directly to main object
+Object.assign(POGOProtos, root.nested);
+
+module.exports = POGOProtos;

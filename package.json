@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/cyraxx/node-pogo-protos#readme",
   "dependencies": {
-    "protobufjs": "^5.0.1"
+    "protobufjs": "^6.8.8"
   },
   "typings": "./pogo-protos.d.ts",
   "devDependencies": {
